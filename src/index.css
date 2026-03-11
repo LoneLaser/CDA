@@ -1,0 +1,183 @@
+@import "tailwindcss";
+
+/* ─── Custom Theme ─── */
+@theme {
+  /* Primary - Deep Indigo/Violet */
+  --color-primary-50: #eef2ff;
+  --color-primary-100: #e0e7ff;
+  --color-primary-200: #c7d2fe;
+  --color-primary-300: #a5b4fc;
+  --color-primary-400: #818cf8;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5;
+  --color-primary-700: #4338ca;
+  --color-primary-800: #3730a3;
+  --color-primary-900: #312e81;
+  --color-primary-950: #1e1b4b;
+
+  /* Accent - Teal */
+  --color-accent-50: #f0fdfa;
+  --color-accent-100: #ccfbf1;
+  --color-accent-200: #99f6e4;
+  --color-accent-300: #5eead4;
+  --color-accent-400: #2dd4bf;
+  --color-accent-500: #14b8a6;
+  --color-accent-600: #0d9488;
+  --color-accent-700: #0f766e;
+  --color-accent-800: #115e59;
+  --color-accent-900: #134e4a;
+  --color-accent-950: #042f2e;
+
+  /* Surface - Slate/Blue Gray */
+  --color-surface-50: #f8fafc;
+  --color-surface-100: #f1f5f9;
+  --color-surface-200: #e2e8f0;
+  --color-surface-300: #cbd5e1;
+  --color-surface-400: #94a3b8;
+  --color-surface-500: #64748b;
+  --color-surface-600: #475569;
+  --color-surface-700: #334155;
+  --color-surface-800: #1e293b;
+  --color-surface-900: #0f172a;
+  --color-surface-950: #020617;
+
+  /* Status Colors */
+  --color-success-400: #4ade80;
+  --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-danger-400: #f87171;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+
+  /* Fonts */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-modal: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-glow: 0 0 20px rgb(99 102 241 / 0.15);
+
+  /* Animations */
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-slide-in: slide-in 0.3s ease-out;
+  --animate-pulse-soft: pulse-soft 2s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ─── Global Styles ─── */
+html {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-surface-950 text-surface-100 font-sans antialiased;
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* ─── Light Mode Overrides ─── */
+html.light {
+  color-scheme: light;
+}
+
+html.light body {
+  @apply bg-surface-50 text-surface-900;
+}
+
+/* Surface backgrounds */
+html.light .bg-surface-900\/80 { background-color: rgba(248, 250, 252, 0.92); }
+html.light .bg-surface-900 { background-color: #ffffff; }
+html.light .bg-surface-950 { background-color: #f8fafc; }
+html.light .bg-surface-800 { background-color: #f1f5f9; }
+html.light .bg-surface-800\/40 { background-color: rgba(241, 245, 249, 0.6); }
+html.light .bg-surface-800\/50 { background-color: rgba(241, 245, 249, 0.7); }
+html.light .bg-surface-800\/60 { background-color: rgba(241, 245, 249, 0.8); }
+html.light .bg-surface-800\/30 { background-color: rgba(241, 245, 249, 0.4); }
+html.light .bg-surface-700\/20 { background-color: rgba(203, 213, 225, 0.25); }
+
+/* Borders */
+html.light .border-surface-700\/50 { border-color: rgba(203, 213, 225, 0.6); }
+html.light .border-surface-700\/30 { border-color: rgba(203, 213, 225, 0.35); }
+html.light .border-surface-700\/40 { border-color: rgba(203, 213, 225, 0.45); }
+html.light .border-surface-600\/50 { border-color: rgba(148, 163, 184, 0.4); }
+html.light .border-surface-800\/50 { border-color: rgba(226, 232, 240, 0.6); }
+
+/* Text */
+html.light .text-surface-50 { color: #0f172a; }
+html.light .text-surface-100 { color: #1e293b; }
+html.light .text-surface-200 { color: #334155; }
+html.light .text-surface-300 { color: #475569; }
+html.light .text-surface-400 { color: #64748b; }
+html.light .text-surface-500 { color: #94a3b8; }
+
+/* Hover variants */
+html.light .hover\:bg-surface-800\/60:hover { background-color: rgba(226, 232, 240, 0.7); }
+html.light .hover\:bg-surface-800\/40:hover { background-color: rgba(226, 232, 240, 0.5); }
+html.light .hover\:bg-surface-700\/20:hover { background-color: rgba(203, 213, 225, 0.25); }
+html.light .hover\:text-surface-200:hover { color: #1e293b; }
+html.light .hover\:text-surface-300:hover { color: #334155; }
+html.light .hover\:border-surface-600\\/60:hover { border-color: rgba(148, 163, 184, 0.5); }
+
+/* Cards & panels get white background in light mode */
+html.light .shadow-card { box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06); }
+
+#root {
+  min-height: 100vh;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-surface-900;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-surface-600 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-surface-500;
+}
+
+/* ─── Selection ─── */
+::selection {
+  @apply bg-primary-600/40 text-white;
+}
+
+/* Grid Layout overrides */
+.react-grid-layout {
+  position: relative;
+}
+
+.react-grid-item {
+  transition: all 200ms ease;
+  transition-property: left, top, width, height;
+}
+
+.react-grid-item.react-grid-placeholder {
+  @apply bg-primary-500/20 rounded-xl;
+  border: 2px dashed var(--color-primary-500);
+}
