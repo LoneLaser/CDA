@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Justin Glaser. All rights reserved.
+// Use of this source code is governed by a license that can be
+// found in the LICENSE file in the root of this repository.
+
 import type { CrosswalkMapping } from '../components/pipeline/CrosswalkEditor';
 import type { ColumnMeta, ColumnType } from '../types';
 

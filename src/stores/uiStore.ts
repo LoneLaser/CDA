@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Justin Glaser. All rights reserved.
+// Use of this source code is governed by a license that can be
+// found in the LICENSE file in the root of this repository.
+
 import { create } from 'zustand';
 import type { Toast } from '../types';
 import { v4 as uuid } from 'uuid';
