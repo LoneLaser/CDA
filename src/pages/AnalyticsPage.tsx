@@ -6,9 +6,12 @@ import { useState, useCallback, useMemo } from 'react';
 import { Header } from '../components/layout';
 import { Card, EmptyState } from '../components/common';
 import { CorrelationHeatmap, DistributionChart, StatsSummary } from '../components/analytics';
+import { AISettingsPanel } from '../components/ai';
 import { useDataStore } from '../stores/dataStore';
 import { useUIStore } from '../stores/uiStore';
+import { useAIStore } from '../stores/aiStore';
 import { runAnalytics, loadAnalytics, type AnalyticsBundle } from '../services/analyticsOrchestrator';
+import { runLLMInsight, type InsightKind, type LLMInsightResult } from '../services/llmInsightsService';
 import { db } from '../db';
 import type { DescriptiveStats, ColumnType } from '../types';
 import {
@@ -24,14 +27,24 @@ import {
   Grid3x3,
   ArrowLeftRight,
   CheckCircle2,
+  Settings,
+  Sparkles,
+  FileText,
+  HeartPulse,
+  ShieldCheck,
+  BookOpen,
+  Copy,
+  Check,
+  AlertCircle,
 } from 'lucide-react';
 
-type Tab = 'overview' | 'descriptive' | 'correlation' | 'distribution';
+type Tab = 'overview' | 'descriptive' | 'correlation' | 'distribution' | 'llm-insights';
 type CorrMode = 'pearson' | 'spearman';
 
 export function AnalyticsPage() {
   const { datasets, activeDatasetId } = useDataStore();
   const addToast = useUIStore((s) => s.addToast);
+  const { isConfigured, getLLMConfig } = useAIStore();
 
   const activeDataset = datasets.find((d) => d.id === activeDatasetId);
   const pipelineDone = activeDataset?.status.gold === 'done';
@@ -46,6 +59,12 @@ export function AnalyticsPage() {
 
   // Cached column data for distribution charts
   const [silverRows, setSilverRows] = useState<Record<string, unknown>[]>([]);
+
+  // LLM Insights state
+  const [llmInsights, setLlmInsights] = useState<LLMInsightResult[]>([]);
+  const [llmLoading, setLlmLoading] = useState(false);
+  const [llmError, setLlmError] = useState<string | null>(null);
+  const [showAISettings, setShowAISettings] = useState(false);
 
   const handleRunAnalytics = useCallback(async () => {
     if (!activeDataset) return;
@@ -187,8 +206,9 @@ export function AnalyticsPage() {
               color="text-warning-400"
               bg="bg-warning-500/10"
               border="border-warning-500/20"
-              active={false}
-              badge="Phase 6"
+              active={llmInsights.length > 0}
+              count={llmInsights.length}
+              badge={!isConfigured() ? 'Configure API' : undefined}
             />
           </div>
 
@@ -246,6 +266,7 @@ export function AnalyticsPage() {
                     { id: 'descriptive' as Tab, label: 'Descriptive Stats', icon: Columns3 },
                     { id: 'correlation' as Tab, label: 'Correlations', icon: ArrowLeftRight },
                     { id: 'distribution' as Tab, label: 'Distributions', icon: BarChart3 },
+                    { id: 'llm-insights' as Tab, label: 'LLM Insights', icon: BrainCircuit },
                   ] as const
                 ).map(({ id, label, icon: Icon }) => (
                   <button
@@ -295,6 +316,51 @@ export function AnalyticsPage() {
                   selectedStats={selectedStats}
                 />
               )}
+
+              {activeTab === 'llm-insights' && activeDataset && (
+                <LLMInsightsTab
+                  analytics={analytics}
+                  sampleRows={silverRows}
+                  datasetName={activeDataset.name}
+                  columns={activeDataset.columns}
+                  rowCount={activeDataset.rowCount}
+                  insights={llmInsights}
+                  loading={llmLoading}
+                  error={llmError}
+                  isConfigured={isConfigured()}
+                  onRun={async (kind) => {
+                    const config = getLLMConfig();
+                    if (!config) {
+                      setShowAISettings(true);
+                      return;
+                    }
+                    setLlmLoading(true);
+                    setLlmError(null);
+                    try {
+                      const result = await runLLMInsight(
+                        config,
+                        kind,
+                        activeDataset.name,
+                        activeDataset.columns,
+                        activeDataset.rowCount,
+                        analytics?.descriptive,
+                        analytics?.correlations,
+                        silverRows.slice(0, 10),
+                      );
+                      setLlmInsights((prev) => [result, ...prev]);
+                      addToast({ type: 'success', title: 'LLM Insight Ready', message: `${result.title} generated` });
+                    } catch (err) {
+                      const msg = err instanceof Error ? err.message : 'LLM request failed';
+                      setLlmError(msg);
+                      addToast({ type: 'error', title: 'LLM Error', message: msg });
+                    } finally {
+                      setLlmLoading(false);
+                    }
+                  }}
+                  onOpenSettings={() => setShowAISettings(true)}
+                  onClear={() => setLlmInsights([])}
+                />
+              )}
             </>
           )}
 
@@ -314,6 +380,9 @@ export function AnalyticsPage() {
           )}
         </div>
       </div>
+
+      {/* ─── AI Settings Modal ─── */}
+      {showAISettings && <AISettingsPanel onClose={() => setShowAISettings(false)} />}
     </div>
   );
 }
@@ -770,4 +839,252 @@ function formatCompact(n: number): string {
   if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(1) + 'K';
   if (Number.isInteger(n)) return n.toLocaleString();
   return n.toFixed(4);
+}
+
+/* ═══════════════ LLM Insights Tab ═══════════════ */
+
+const INSIGHT_KINDS: { kind: InsightKind; icon: typeof FileText; label: string; desc: string; gradient: string }[] = [
+  { kind: 'themes', icon: Sparkles, label: 'Themes', desc: 'Major themes & patterns', gradient: 'from-amber-500 to-orange-600' },
+  { kind: 'sentiment', icon: HeartPulse, label: 'Sentiment', desc: 'Quality & sentiment assessment', gradient: 'from-rose-500 to-pink-600' },
+  { kind: 'quality', icon: ShieldCheck, label: 'Quality Audit', desc: 'Data quality deep-dive', gradient: 'from-emerald-500 to-green-600' },
+  { kind: 'narrative', icon: BookOpen, label: 'Narrative', desc: 'Stakeholder-ready story', gradient: 'from-violet-500 to-purple-600' },
+];
+
+function LLMInsightsTab({
+  analytics,
+  insights,
+  loading,
+  error,
+  isConfigured,
+  onRun,
+  onOpenSettings,
+  onClear,
+}: {
+  analytics: AnalyticsBundle | null;
+  sampleRows: Record<string, unknown>[];
+  datasetName: string;
+  columns: import('../types').ColumnMeta[];
+  rowCount: number;
+  insights: LLMInsightResult[];
+  loading: boolean;
+  error: string | null;
+  isConfigured: boolean;
+  onRun: (kind: InsightKind) => void;
+  onOpenSettings: () => void;
+  onClear: () => void;
+}) {
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+
+  const handleCopy = async (text: string, idx: number) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 2000);
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className={`w-2 h-2 rounded-full ${isConfigured ? 'bg-success-400' : 'bg-surface-600'}`} />
+          <span className="text-xs text-surface-400">
+            {isConfigured ? 'LLM Connected' : 'No API key configured'}
+          </span>
+          <button
+            onClick={onOpenSettings}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-surface-300 border border-surface-700/50 hover:border-surface-600 hover:text-surface-100 transition-colors"
+          >
+            <Settings className="w-3.5 h-3.5" />
+            AI Settings
+          </button>
+        </div>
+        {insights.length > 0 && (
+          <button
+            onClick={onClear}
+            className="text-xs text-surface-500 hover:text-danger-400 transition-colors"
+          >
+            Clear all
+          </button>
+        )}
+      </div>
+
+      {/* Context hint */}
+      {!analytics && (
+        <div className="flex items-center gap-2 p-3 rounded-lg border border-surface-700/30 bg-surface-800/40">
+          <AlertCircle className="w-4 h-4 text-warning-400 shrink-0" />
+          <span className="text-xs text-surface-400">
+            Run Analytics first for richer LLM insights (descriptive stats & correlations will be included in the prompt).
+          </span>
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div className="flex items-start gap-3 p-4 rounded-xl border border-danger-500/30 bg-danger-600/10">
+          <AlertCircle className="w-5 h-5 text-danger-400 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-danger-300">LLM Error</p>
+            <p className="text-xs text-danger-400/80 mt-0.5">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Insight Kind Buttons */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {INSIGHT_KINDS.map(({ kind, icon: Icon, label, desc, gradient }) => (
+          <button
+            key={kind}
+            onClick={() => onRun(kind)}
+            disabled={loading || !isConfigured}
+            className="flex flex-col items-center gap-2 p-4 rounded-xl border border-surface-700/40 bg-surface-800/30 hover:border-surface-600/60 transition-all disabled:opacity-40 disabled:cursor-not-allowed group"
+          >
+            <div className={`p-2.5 rounded-lg bg-gradient-to-br ${gradient} shadow-sm group-hover:shadow-md transition-shadow`}>
+              {loading ? (
+                <Loader2 className="w-5 h-5 text-white animate-spin" />
+              ) : (
+                <Icon className="w-5 h-5 text-white" />
+              )}
+            </div>
+            <div className="text-center">
+              <div className="text-xs font-medium text-surface-100">{label}</div>
+              <div className="text-[10px] text-surface-500 mt-0.5">{desc}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Results */}
+      {insights.length > 0 ? (
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-surface-200 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-warning-400" />
+            Results ({insights.length})
+          </h3>
+          {insights.map((ins, idx) => {
+            const kindCfg = INSIGHT_KINDS.find((k) => k.kind === ins.kind);
+            const KindIcon = kindCfg?.icon ?? Sparkles;
+            return (
+              <div
+                key={`${ins.kind}-${ins.generatedAt}`}
+                className="rounded-xl border border-surface-700/50 bg-surface-800/50 overflow-hidden animate-fade-in"
+              >
+                {/* Result header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-surface-700/30">
+                  <div className="flex items-center gap-3">
+                    <KindIcon className="w-4 h-4 text-warning-400" />
+                    <div>
+                      <span className="text-sm font-semibold text-surface-100">{ins.title}</span>
+                      <div className="flex items-center gap-3 text-[10px] text-surface-500 mt-0.5">
+                        <span className="font-mono">{ins.model}</span>
+                        <span>{new Date(ins.generatedAt).toLocaleTimeString()}</span>
+                        {ins.tokenUsage && <span>{ins.tokenUsage.total.toLocaleString()} tokens</span>}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleCopy(ins.markdown, idx)}
+                    className="p-1.5 rounded-lg text-surface-500 hover:text-surface-300 hover:bg-surface-700/50 transition-colors"
+                    title="Copy"
+                  >
+                    {copiedIdx === idx ? <Check className="w-3.5 h-3.5 text-success-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                {/* Markdown body */}
+                <div className="p-4 text-sm text-surface-200 leading-relaxed whitespace-pre-wrap break-words">
+                  <SimpleMarkdown content={ins.markdown} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        !loading && (
+          <Card>
+            <EmptyState
+              icon={<BrainCircuit className="w-7 h-7 text-surface-500" />}
+              title="No LLM insights yet"
+              description={
+                isConfigured
+                  ? 'Select an insight type above to generate AI-powered analysis of your dataset.'
+                  : 'Configure an API key in AI Settings to start generating insights.'
+              }
+            />
+          </Card>
+        )
+      )}
+    </div>
+  );
+}
+
+/* ─── Lightweight inline Markdown renderer ─── */
+
+function SimpleMarkdown({ content }: { content: string }) {
+  const lines = content.split('\n');
+  const elements: React.ReactNode[] = [];
+  let inCode = false;
+  let codeLines: string[] = [];
+  let codeKey = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.startsWith('```')) {
+      if (inCode) {
+        elements.push(
+          <pre key={`code-${codeKey++}`} className="my-2 p-3 rounded-lg bg-surface-900/80 border border-surface-700/30 text-[11px] font-mono text-surface-300 overflow-x-auto">
+            {codeLines.join('\n')}
+          </pre>,
+        );
+        codeLines = [];
+        inCode = false;
+      } else {
+        inCode = true;
+      }
+      continue;
+    }
+    if (inCode) { codeLines.push(line); continue; }
+
+    if (line.startsWith('### '))
+      elements.push(<h4 key={i} className="text-sm font-semibold text-surface-100 mt-4 mb-1">{mdInline(line.slice(4))}</h4>);
+    else if (line.startsWith('## '))
+      elements.push(<h3 key={i} className="text-base font-semibold text-surface-50 mt-4 mb-1.5">{mdInline(line.slice(3))}</h3>);
+    else if (line.startsWith('# '))
+      elements.push(<h2 key={i} className="text-lg font-bold text-surface-50 mt-4 mb-2">{mdInline(line.slice(2))}</h2>);
+    else if (/^[-*]\s/.test(line))
+      elements.push(
+        <div key={i} className="flex gap-2 ml-2 my-0.5">
+          <span className="text-warning-400 mt-0.5 shrink-0">•</span>
+          <span>{mdInline(line.replace(/^[-*]\s/, ''))}</span>
+        </div>,
+      );
+    else if (/^\d+\.\s/.test(line)) {
+      const m = line.match(/^(\d+)\.\s(.*)/)!;
+      elements.push(
+        <div key={i} className="flex gap-2 ml-2 my-0.5">
+          <span className="text-warning-400 font-mono text-xs mt-0.5 shrink-0 w-5 text-right">{m[1]}.</span>
+          <span>{mdInline(m[2])}</span>
+        </div>,
+      );
+    } else if (/^---+$/.test(line.trim()))
+      elements.push(<hr key={i} className="border-surface-700/50 my-3" />);
+    else if (!line.trim())
+      elements.push(<div key={i} className="h-2" />);
+    else
+      elements.push(<p key={i} className="my-0.5">{mdInline(line)}</p>);
+  }
+  return <>{elements}</>;
+}
+
+function mdInline(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|~~[^~]+~~)/g);
+  return parts.map((p, i) => {
+    if (p.startsWith('**') && p.endsWith('**'))
+      return <strong key={i} className="font-semibold text-surface-100">{p.slice(2, -2)}</strong>;
+    if (p.startsWith('*') && p.endsWith('*'))
+      return <em key={i} className="italic text-surface-300">{p.slice(1, -1)}</em>;
+    if (p.startsWith('`') && p.endsWith('`'))
+      return <code key={i} className="px-1 py-0.5 rounded bg-surface-700/60 text-primary-300 text-[11px] font-mono">{p.slice(1, -1)}</code>;
+    if (p.startsWith('~~') && p.endsWith('~~'))
+      return <s key={i} className="text-surface-500">{p.slice(2, -2)}</s>;
+    return p;
+  });
 }
