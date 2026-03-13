@@ -8,8 +8,43 @@ import { cleanData, type CleaningReport } from './cleaningEngine';
 import { profileData } from './profilingEngine';
 import { materializeGold, type GoldSummary } from './goldMaterializer';
 import type { ColumnType, ProfileStats, DatasetMeta, StageStatus } from '../types';
+import type { CrosswalkMapping } from '../components/pipeline/CrosswalkEditor';
 
 const BATCH_SIZE = 500;
+
+/** Apply crosswalk value maps and column renames to raw rows (no column-metadata handling). */
+function applyCrosswalkToRows(
+  rows: Record<string, unknown>[],
+  mappings: CrosswalkMapping[],
+): Record<string, unknown>[] {
+  const relevant = mappings.filter(
+    (m) => m.originalName !== m.newName || m.valueMap || m.keepOriginal,
+  );
+  if (!relevant.length) return rows;
+  return rows.map((row) => {
+    const newRow: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(row)) {
+      const mapping = relevant.find((m) => m.originalName === key);
+      if (mapping) {
+        if (mapping.valueMap && mapping.newType === 'number') {
+          const strVal = val !== null && val !== undefined ? String(val) : null;
+          newRow[mapping.newName] =
+            strVal !== null && Object.prototype.hasOwnProperty.call(mapping.valueMap, strVal)
+              ? mapping.valueMap[strVal]
+              : null;
+        } else {
+          newRow[mapping.newName] = val;
+        }
+        if (mapping.keepOriginal) {
+          newRow[`${mapping.originalName}_original`] = val;
+        }
+      } else {
+        newRow[key] = val;
+      }
+    }
+    return newRow;
+  });
+}
 
 export interface PipelineCallbacks {
   onStatusChange: (stage: 'bronze' | 'silver' | 'gold', status: StageStatus) => void;
@@ -37,6 +72,7 @@ export interface PipelineResult {
 export async function runPipeline(
   dataset: DatasetMeta,
   callbacks: PipelineCallbacks,
+  crosswalkMappings?: CrosswalkMapping[],
 ): Promise<void> {
   const { id: datasetId } = dataset;
 
@@ -45,8 +81,13 @@ export async function runPipeline(
     callbacks.onStatusChange('silver', 'processing');
     callbacks.onProgress('Loading Bronze data...');
 
-    const bronzeRows = await loadBronzeRows(datasetId);
+    let bronzeRows = await loadBronzeRows(datasetId);
     callbacks.onProgress(`Loaded ${bronzeRows.length} Bronze rows`);
+
+    // Apply crosswalk value maps / renames to bronze rows before cleaning
+    if (crosswalkMappings?.length) {
+      bronzeRows = applyCrosswalkToRows(bronzeRows, crosswalkMappings);
+    }
 
     // Prepare column type info
     const columnTypes = dataset.columns.map((c) => ({

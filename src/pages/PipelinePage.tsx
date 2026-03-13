@@ -164,7 +164,7 @@ export function PipelinePage() {
           onError: (err) => {
             addToast({ type: 'error', title: 'Pipeline Error', message: err.message });
           },
-        });
+        }, mappings);
       } catch (err) {
         addToast({
           type: 'error',
@@ -369,6 +369,7 @@ export function PipelinePage() {
       {showCrosswalk && activeDataset && (
         <CrosswalkEditor
           columns={activeDataset.columns}
+          profile={profile}
           onApply={handleCrosswalkApply}
           onCancel={() => setShowCrosswalk(false)}
         />

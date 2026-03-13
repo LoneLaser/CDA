@@ -146,6 +146,7 @@ export interface LLMConfig {
   provider: LLMProvider;
   apiKey: string;
   model: string;
+  baseUrl?: string;
 }
 
 export type AIAnalysisType =

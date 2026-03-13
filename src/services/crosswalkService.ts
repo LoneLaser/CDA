@@ -25,15 +25,18 @@ export function applyCrosswalk(
   if (!hasChanges) return { rows, columns };
 
   // Apply column renaming & retyping to metadata
-  const newColumns = columns.map((col): ColumnMeta => {
+  const newColumns: ColumnMeta[] = [];
+  for (const col of columns) {
     const mapping = mappingByOrig.get(col.name);
-    if (!mapping) return col;
-    return {
-      ...col,
-      name: mapping.newName,
-      type: mapping.newType,
-    };
-  });
+    if (mapping) {
+      newColumns.push({ ...col, name: mapping.newName, type: mapping.newType });
+      if (mapping.keepOriginal) {
+        newColumns.push({ ...col, name: `${mapping.originalName}_original`, type: col.type });
+      }
+    } else {
+      newColumns.push(col);
+    }
+  }
 
   // Apply renaming & type coercion to rows
   const newRows = rows.map((row) => {
@@ -41,7 +44,18 @@ export function applyCrosswalk(
     for (const [key, val] of Object.entries(row)) {
       const mapping = mappingByOrig.get(key);
       if (mapping) {
-        newRow[mapping.newName] = coerceValue(val, mapping.newType);
+        if (mapping.valueMap && mapping.newType === 'number') {
+          const strVal = val !== null && val !== undefined ? String(val) : null;
+          newRow[mapping.newName] =
+            strVal !== null && Object.prototype.hasOwnProperty.call(mapping.valueMap, strVal)
+              ? mapping.valueMap[strVal]
+              : null;
+        } else {
+          newRow[mapping.newName] = coerceValue(val, mapping.newType);
+        }
+        if (mapping.keepOriginal) {
+          newRow[`${mapping.originalName}_original`] = val;
+        }
       } else {
         newRow[key] = val;
       }

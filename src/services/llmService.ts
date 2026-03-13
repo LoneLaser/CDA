@@ -143,7 +143,8 @@ interface LLMResponse {
 }
 
 async function callOpenAI(config: LLMConfig, prompt: string): Promise<LLMResponse> {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const baseUrl = config.baseUrl?.replace(/\/$/, '') ?? 'https://api.openai.com/v1';
+  const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -181,7 +182,8 @@ async function callOpenAI(config: LLMConfig, prompt: string): Promise<LLMRespons
 }
 
 async function callAnthropic(config: LLMConfig, prompt: string): Promise<LLMResponse> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const baseUrl = config.baseUrl?.replace(/\/$/, '') ?? 'https://api.anthropic.com';
+  const res = await fetch(`${baseUrl}/v1/messages`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -239,7 +241,8 @@ export async function queryLLM(config: LLMConfig, prompt: string): Promise<LLMRe
 }
 
 async function callGemini(config: LLMConfig, prompt: string): Promise<LLMResponse> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`;
+  const baseUrl = config.baseUrl?.replace(/\/$/, '') ?? 'https://generativelanguage.googleapis.com/v1beta';
+  const url = `${baseUrl}/models/${config.model}:generateContent?key=${config.apiKey}`;
   
   const res = await fetch(url, {
     method: 'POST',

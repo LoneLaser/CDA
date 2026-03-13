@@ -9,6 +9,9 @@ export default defineConfig({
       '@': '/src',
     },
   },
+  optimizeDeps: {
+    include: ['html2canvas', 'jspdf', 'pptxgenjs'],
+  },
   build: {
     rollupOptions: {
       output: {

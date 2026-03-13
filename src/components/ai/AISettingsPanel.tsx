@@ -16,8 +16,10 @@ export function AISettingsPanel({ onClose }: AISettingsPanelProps) {
   const {
     provider, model,
     openaiKey, anthropicKey, geminiKey,
+    openaiEndpoint, anthropicEndpoint, geminiEndpoint,
     setProvider, setModel,
     setOpenAIKey, setAnthropicKey, setGeminiKey,
+    setOpenAIEndpoint, setAnthropicEndpoint, setGeminiEndpoint,
   } = useAIStore();
 
   const [showOpenAI, setShowOpenAI] = useState(false);
@@ -32,6 +34,14 @@ export function AISettingsPanel({ onClose }: AISettingsPanelProps) {
 
   const activeKey = provider === 'openai' ? openaiKey : provider === 'anthropic' ? anthropicKey : geminiKey;
   const isConfigured = activeKey.length > 0;
+
+  const activeEndpoint = provider === 'openai' ? openaiEndpoint : provider === 'anthropic' ? anthropicEndpoint : geminiEndpoint;
+  const setActiveEndpoint = provider === 'openai' ? setOpenAIEndpoint : provider === 'anthropic' ? setAnthropicEndpoint : setGeminiEndpoint;
+  const endpointPlaceholder = provider === 'openai'
+    ? 'https://api.openai.com/v1'
+    : provider === 'anthropic'
+    ? 'https://api.anthropic.com'
+    : 'https://generativelanguage.googleapis.com/v1beta';
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -91,6 +101,23 @@ export function AISettingsPanel({ onClose }: AISettingsPanelProps) {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Custom API Endpoint */}
+          <div>
+            <label className="block text-xs font-medium text-surface-300 mb-1.5">
+              API Base URL <span className="text-surface-500 font-normal">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={activeEndpoint}
+              onChange={(e) => setActiveEndpoint(e.target.value)}
+              placeholder={endpointPlaceholder}
+              className="w-full px-3 py-2 rounded-lg bg-surface-800 border border-surface-700/50 text-sm text-surface-100 placeholder:text-surface-600 font-mono focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/25 transition-colors"
+            />
+            <p className="text-[10px] text-surface-500 mt-1">
+              Override for self-hosted models (Ollama, LM Studio, Azure) or API proxies. Leave empty to use the default endpoint.
+            </p>
           </div>
 
           {/* API Keys */}
